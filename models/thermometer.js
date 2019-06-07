@@ -1,17 +1,20 @@
 var mongoose = require('mongoose');
 
-var Temperature = mongoose.model('Temperature', {
+var Thermometer = mongoose.model('Thermometer', {
   timestamp: {
     type: String,
     required: true,
-    unique: true
   },
   temperature: {
     type: String,
     required: true
+  },
+  serialNumber: {
+    type: String,
+    required: true,
   }
 });
 
 module.exports = {
-  Temperature
+  Thermometer
 };

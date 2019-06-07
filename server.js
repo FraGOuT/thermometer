@@ -4,10 +4,13 @@ const{ObjectID} = require('mongodb');
 var app = express();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
-var{Temperature} = require('./models/temperature');
+var{Thermometer} = require('./models/thermometer');
 var{mongoose} = require('./db/mongoose');
 const multer = require('multer');
 const fs = require('fs');
+const hbs = require('hbs');
+
+app.set('view engine','hbs');
 
 const fileUploadDirName = 'uploads';
 const maxFileBatchSize = 20;
@@ -23,57 +26,71 @@ var storage = multer.diskStorage({
     cb(null, fileUploadDirName)
   },
   filename: function (req, file, cb) {
-    cb(null, file.fieldname + '-' + Date.now())
+    cb(null, file.originalname)
   }
 })
- 
 var upload = multer({ storage: storage })
 
-app.get('/temperature',function(req,res){
+app.get('/', (req, res) => {
+  res.send("Data gathering for thermometer")
+});
+
+app.get('/dashboard/:id', (req, res) => {
+  var serialNumber = req.params.id
+  res.render('dashboard.hbs',{
+    serialNumber: serialNumber
+  });
+});
+
+app.get('/thermometer/:id',(req,res) => {
+  var serialNumber = req.params.id
   var d = new Date();
   d.setFullYear(d.getFullYear() - 1);
   var startTimeStamp = Math.round(d.getTime() / 1000);
-  var query = { timestamp: { $gte: startTimeStamp} };
-  Temperature.find(query, function(err, temp){
+  var query = { timestamp: { $gte: startTimeStamp}, serialNumber: serialNumber };
+  Thermometer.find(query, function(err, temp){
     if(err) throw new Error(err);
     if(!temp) 
       console.log('No data found for the past 1 year');
     else
+      console.log(temp);
       res.send(temp)
   });
 });
 
 
-app.get('/upload',function(req,res){
+app.get('/upload',(req,res) => {
   res.sendFile('public/upload.html', { root: __dirname });
 });
 
 //Uploading multiple files
-app.post('/uploadBatch', upload.array('myFiles', maxFileBatchSize), (req, res, next) => {
+app.post('/upload', upload.array('myFiles', maxFileBatchSize), (req, res, next) => {
   const files = req.files
   if (!files) {
     const error = new Error('Please choose files');
     error.httpStatusCode = 400;
     return next(error);
   }
-  console.log(files);
+  // console.log(files);
   for(var file of files) {
     //Process the file in an async manner
+    console.log("Processing File - "+file.path)
     fs.readFile(file.path, (err, data) => {  
-      console.log("Process File - "+file.path)
       if (err) throw err;
       let temperature_data = JSON.parse(data);
-      console.log(temperature_data);
+      // console.log(temperature_data);
       for(var data in temperature_data){
         data = temperature_data[data]
-        var temperature = new Temperature({
+        var thermometer = new Thermometer({
           timestamp: data.ts,
-          temperature: data.val
+          temperature: data.val,
+          serialNumber: file.originalname
         })
-        temperature.save().then((doc)=>{
-          console.log('Data Point Saved');
+        thermometer.save().then((doc)=>{
+          // console.log('Data Point Saved');
         },(err)=>{
           console.log('Data point not saved');
+          console.log(err);
         });
       };
     });
@@ -81,22 +98,24 @@ app.post('/uploadBatch', upload.array('myFiles', maxFileBatchSize), (req, res, n
   res.send("Files Uploaded Successfully")
 })
 
-app.post('/temperature', (req, res) => {
+app.post('/thermometer/', (req, res) => {
   console.log('Redeived temperature reading');
   var timestamp = req.body.timestamp;
   var temperature = req.body.temperature;
-  var data = {'timestamp':timestamp, 'temperature': temperature};
-  console.log(data);
+  var serialNumber = req.body.serialNumber;
+  var data = {'timestamp':timestamp, 'temperature': temperature, 'serialNumber': serialNumber};
+  // console.log(data);
 
-  var temperature = new Temperature({
+  var thermometer = new Thermometer({
     timestamp: req.body.timestamp,
-    temperature: req.body.temperature
+    temperature: req.body.temperature,
+    serialNumber: req.body.serialNumber
   })
-  temperature.save().then((doc)=>{
-    io.emit('realtime_thermometer_feed', data);
+  thermometer.save().then((doc)=>{
+    io.emit('realtime_thermometer_feed-'+serialNumber, data);
     res.status(200).send();
   },(err)=>{
-    console.log('Data point not Added to mongo. Data= '+data)
+    console.log('Data point not Added to mongo')
     res.status(400).send(err);
   });
 });

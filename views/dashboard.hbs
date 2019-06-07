@@ -38,7 +38,7 @@
 
             function getChartData(chart) {
                 $.ajax({
-                    url: "http://localhost:3000/temperature",
+                    url: "http://localhost:3000/thermometer/{{serialNumber}}",
                     success: function (result) {
                         for (d in result)
                         {
@@ -58,7 +58,7 @@
             getChartData(chart);
 
             var socket = io.connect('http://localhost:3000'); //connect to server
-            socket.on('realtime_thermometer_feed', function(data) {
+            socket.on('realtime_thermometer_feed-{{serialNumber}}', function(data) {
                 chart.data.labels.push(data.timestamp); //x-axis
                 chart.data.datasets.forEach((dataset) => {
                     dataset.data.push(data.temperature); //y-axis
