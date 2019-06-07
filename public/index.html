@@ -2,35 +2,62 @@
 <html>
     <head>
         <title>Temperature Plot</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta charset="UTF-8">
     </head>
     <body>
-        <h1>Temperature Graph</h1>
+        <h1>Dashboard</h1>
         <div class="chart-container" style="position: relative; width:75vw; margin: auto;">
             <canvas id="temperatureChart"></canvas>
         </div>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
         <script>
-            var socket = io.connect('http://localhost:3000'); //connect to server
-            var ctx = document.getElementById('temperatureChart').getContext('2d');
+            var ctx = document.getElementById("temperatureChart").getContext('2d');
             var chart = new Chart(ctx, {
-                // The type of chart we want to create
                 type: 'line',
-                // The data for our dataset
                 data: {
-                labels: [],
-                datasets: [{
-                    label: "Temperature",
-                    borderColor: "#FF5733",
-                    data: [],
-                    fill: false
-                }]
+                    labels: [],
+                    datasets: [{
+                        label: 'Temperature Data',
+                        data: [],
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    }]
                 },
-                // Configuration options go here
-                options: {}
-
+                options: {            
+                    scales: {
+                        yAxes: [{
+                            ticks: {
+                                beginAtZero: true,
+                            }
+                        }]                
+                    }
+                },
             });
+
+            function getChartData(chart) {
+                $.ajax({
+                    url: "http://localhost:3000/temperature",
+                    success: function (result) {
+                        for (d in result)
+                        {
+                            // console.log(result[d])
+                            chart.data.labels.push(result[d].timestamp); //x-axis
+                            chart.data.datasets.forEach((dataset) => {
+                                dataset.data.push(result[d].temperature); //y-axis
+                            });
+                            chart.update();
+                        }
+                    },
+                    error: function (err) {
+                        console.log('Data is not received')
+                    }
+                });
+            }
+            getChartData(chart);
+
+            var socket = io.connect('http://localhost:3000'); //connect to server
             socket.on('realtime_thermometer_feed', function(data) {
                 chart.data.labels.push(data.timestamp); //x-axis
                 chart.data.datasets.forEach((dataset) => {
